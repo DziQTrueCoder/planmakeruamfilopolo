@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mój Harmonogram Zajęć i Listy Lektur</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Biblioteki do generowania PDF/obrazu -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaRQnYJJoOoTXfzshSLSopTn4hvgTqizL0NiFit3DFYmFCaeGaSFuC9tmHVyDNxOfPChKwXkHtQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-EoHragS+WiaTghZGhMsQhS4sFJGtXA/8nJME1uY/x+tpzRBMH0Kz6H6HhZcK2fJ6B/W3/C4D1/zQd+tF6M5A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f3f4f6;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 0;
+}
+
+* {
+    border-radius: 0.5rem;
+}
+
+.schedule-item {
+    position: relative;
+    padding: 0.75rem;
+    border-left: 4px solid;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease-in-out;
+    background-color: white;
+    font-size: 0.875rem;
+    z-index: 1;
+    box-sizing: border-box;
+    margin-bottom: 0.75rem;
+    width: calc(100% - 1rem);
+    left: 0.5rem;
+}
+
+.schedule-item h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.schedule-item p {
+    font-size: 0.75rem;
+    color: #4b5563;
+    line-height: 1.2;
+}
+
+.schedule-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    min-height: 300px;
+    overflow-y: visible;
+    padding-bottom: 0.5rem;
+    flex-grow: 1;
+}
+
+.day-column {
+    position: relative;
+    background-color: #f9fafb;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-container {
+    position: relative;
+    flex-grow: 1;
+    min-height: 400px;
+    overflow-y: auto;
+    padding-top: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+/* Główne kontenery aplikacji */
+.app-container {
+    max-width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+}
+
+/* Message box styling */
+#message-box {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.75rem 1rem;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    font-size: 0.875rem;
+}
+
+#message-box.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+#message-box.error {
+    background-color: #f44336;
+}
+
+/* Modal styling */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+    max-width: 90%;
+    width: 400px;
+}
+
+.modal-content h3 {
+    font-size: 1.5rem;
+}
+
+.modal-content p {
+    font-size: 0.875rem;
+}
+
+.modal-content button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* Stylizacja dla dostępnych zajęć */
+#available-schedule-display .schedule-item {
+    background-color: #e0f2f7;
+    border: 2px solid #0d6efd;
+    box-shadow: 0 3px 6px rgba(13, 110, 253, 0.2);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#available-schedule-display .schedule-item:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 16px rgba(13, 110, 253, 0.3);
+    z-index: 20;
+}
+
+#available-schedule-display h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #052c65;
+}
+
+#available-schedule-display p {
+    font-size: 0.8rem;
+    color: #343a40;
+}
+
+/* Styling dla listy lektur */
+.reading-list-item {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border-left: 3px solid #6c757d;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    line-height: 1.4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.reading-list-item strong {
+    color: #343a40;
+}
+
+.reading-list-item small {
+    color: #6c757d;
+    display: block;
+    margin-top: 0.2rem;
+}
+
+.reading-list-header {
+    background-color: #e9ecef;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+    margin-bottom: 0;
+    font-weight: 600;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.reading-list-collapse {
+    background-color: white;
+    border: 1px solid rgba(0,0,0,.125);
+    border-top: none;
+    border-bottom-left-radius: 0.25rem;
+    border-bottom-right-radius: 0.25rem;
+    padding: 1.25rem;
+}
+
+/* Ukrywanie/pokazywanie sekcji głównej */
+.content-section {
+    transition: opacity 0.3s ease-in-out;
+}
+
+.content-section.d-none {
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.progress-container {
+    height: 20px;
+    background-color: #e9ecef;
+    border-radius: 0.25rem;
+    margin-top: 1rem;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0;
+    background-color: #0d6efd;
+    transition: width 0.3s ease;
+}
+
+/* Responsywność */
+@media (max-width: 768px) {
+    .schedule-grid-container {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+    .app-container {
+        padding: 0.5rem;
+    }
+    h1 {
+        font-size: 2rem;
+    }
+    h2 {
+        font-size: 1.75rem;
+    }
+}
+    </style>
+    <script>
+document.addEventListener('DOMContentLoaded', () => {
+    const availableScheduleDisplay = document.getElementById('available-schedule-display');
+    const myScheduleDisplay = document.getElementById('my-schedule-display');
+    const messageBox = document.getElementById('message-box');
+    const conflictModal = document.getElementById('conflict-modal');
+    const modalCancelButton = document.getElementById('modal-cancel');
+    const modalReplaceButton = document.getElementById('modal-replace');
+    const currentConflictTitle = document.getElementById('current-conflict-title');
+    const newConflictTitle = document.getElementById('new-conflict-title');
+    const generateHtmlButton = document.getElementById('generate-html-button');
+    const generatePdfButton = document.getElementById('generate-pdf-button');
+    const clearMyPlanButton = document.getElementById('clear-my-plan-button');
+    const myScheduleSection = document.getElementById('my-schedule-section');
+    const readingListSection = document.getElementById('reading-list-section');
+    const planGeneratorSection = document.getElementById('plan-generator-section');
+    const showScheduleButton = document.getElementById('show-schedule-button');
+    const showReadingListButton = document.getElementById('show-reading-list-button');
+    const showGeneratorButton = document.getElementById('show-generator-button');
+    const startTimeInput = document.getElementById('start-time-input');
+    const endTimeInput = document.getElementById('end-time-input');
+    const generateAllPlansButton = document.getElementById('generate-all-plans-button');
+    const allPossiblePlansDisplay = document.getElementById('all-possible-plans-display');
+    const progressBar = document.getElementById('progress-bar');
+    const progressContainer = document.getElementById('progress-container');
+
+    // Filtry / formularze
+    const scheduleSearchInput = document.getElementById('schedule-search-input');
+    const scheduleDayFilter = document.getElementById('schedule-day-filter');
+    const scheduleFacultyFilter = document.getElementById('schedule-faculty-filter');
+    const scheduleResetFilters = document.getElementById('schedule-reset-filters');
+
+    // Formularz własnych zajęć
+    const customEventForm = document.getElementById('custom-event-form');
+    const customTitle = document.getElementById('custom-title');
+    const customDay = document.getElementById('custom-day');
+    const customStart = document.getElementById('custom-start');
+    const customEnd = document.getElementById('custom-end');
+    const customInstructor = document.getElementById('custom-instructor');
+    const customGroup = document.getElementById('custom-group');
+    const customFaculty = document.getElementById('custom-faculty');
+    const customLocation = document.getElementById('custom-location');
+    const customColor = document.getElementById('custom-color');
+
+    let availableSchedules = [];
+    let mySchedules = [];
+    let pendingConflictSchedule = null;
+    const daysOfWeek = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek'];
+
+    function showMessage(message, type) {
+        messageBox.textContent = message;
+        messageBox.className = `message-box show ${type}`;
+        setTimeout(() => {
+            messageBox.classList.remove('show');
+        }, 3000);
+    }
+
+    function timeToMinutes(timeString) {
+        const [hours, minutes] = timeString.split(':').map(Number);
+        return hours * 60 + minutes;
+    }
+
+    function checkConflict(newSchedule, targetSchedules) {
+        const newStart = timeToMinutes(newSchedule.time);
+        const newEnd = timeToMinutes(newSchedule.endTime);
+        const isDuplicate = targetSchedules.some(s =>
+            s.title.split(' - ')[0] === newSchedule.title.split(' - ')[0]
+        );
+        if (isDuplicate) {
+            showMessage(`Przedmiot "${newSchedule.title.split(' - ')[0]}" już znajduje się w Twoim planie!`, 'error');
+            return true;
+        }
+        if (targetSchedules.filter(s => s.title.includes('Ćwiczenia')).length >= 7) {
+            showMessage('Nie możesz dodać więcej niż 7 ćwiczeń w tygodniu!', 'error');
+            return true;
+        }
+        for (const existingSchedule of targetSchedules) {
+            if (existingSchedule.day === newSchedule.day) {
+                const existingStart = timeToMinutes(existingSchedule.time);
+                const existingEnd = timeToMinutes(existingSchedule.endTime);
+
+                if ((newStart < existingEnd && newEnd > existingStart) ||
+                    (existingStart < newEnd && existingEnd > newStart)) {
+                    return existingSchedule;
+                }
+            }
+        }
+        return null;
+    }
+
+    function saveMySchedules() {
+        localStorage.setItem('mySchedules', JSON.stringify(mySchedules));
+    }
+
+    function loadMySchedules() {
+        const stored = localStorage.getItem('mySchedules');
+        if (stored) {
+            mySchedules = JSON.parse(stored);
+        }
+    }
+
+    function saveAvailableSchedules() {
+        localStorage.setItem('availableSchedules', JSON.stringify(availableSchedules));
+    }
+
+    function loadAvailableSchedules() {
+        // 1) Szybkie wczytanie z localStorage lub domyślnych danych (natychmiastowy render)
+        const storedSchedules = localStorage.getItem('availableSchedules');
+        if (storedSchedules) {
+            availableSchedules = JSON.parse(storedSchedules);
+        } else {
+            initializeDefaultSchedules();
+            saveAvailableSchedules();
+        }
+        // 2) Próba wczytania świeżych danych z data.json (GitHub Pages / statyczny hosting)
+        fetch('data.json', { cache: 'no-store' })
+            .then(res => res.ok ? res.json() : null)
+            .then(json => {
+                if (json && Array.isArray(json.availableSchedules)) {
+                    availableSchedules = json.availableSchedules;
+                    saveAvailableSchedules();
+                    renderAvailable();
+                }
+            })
+            .catch(() => {
+                // Ignoruj w trybie offline lub gdy pliku brak
+            });
+    }
+
+    function initializeDefaultSchedules() {
+        availableSchedules = [
+            // FILOLOGIA POLSKA - ĆWICZENIA
+            { id: '1', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Piątek', time: '08:00', endTime: '09:30', instructor: 'Ewa Szkudlarek', group: 'Grupa 1', color: '#B0E0E6', faculty: 'Filologia Polska' },
+            { id: '2', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Wtorek', time: '11:30', endTime: '13:00', instructor: 'Ewa Szkudlarek', group: 'Grupa 2', color: '#B0E0E6', faculty: 'Filologia Polska' },
+            { id: '3', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Piątek', time: '09:45', endTime: '11:15', instructor: 'Agnieszka Rydz', group: 'Grupa 3', color: '#B0E0E6', faculty: 'Filologia Polska' },
+            { id: '4', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Środa', time: '13:15', endTime: '14:45', instructor: 'Joanna Maleszyńska', group: 'Grupa 4', color: '#B0E0E6', faculty: 'Filologia Polska' },
+            { id: '5', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Czwartek', time: '09:45', endTime: '11:15', instructor: 'Jacek Nowakowski', group: 'Grupa 5', color: '#B0E0E6', faculty: 'Filologia Polska' },
+            { id: '6', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Wtorek', time: '13:15', endTime: '14:45', instructor: 'Krzysztof Gajda', group: 'Grupa 6', color: '#B0E0E6', faculty: 'Filologia Polska' },
+            { id: '7', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Czwartek', time: '17:00', endTime: '18:30', instructor: 'Magdalena Bednarek', group: 'Grupa 7', color: '#B0E0E6', faculty: 'Filologia Polska' },
+            { id: '8', title: 'Poetyka z analizą dzieła literackiego - Ćwiczenia', day: 'Czwartek', time: '08:00', endTime: '09:30', instructor: 'Ewelina Bulewicz-Rewers', group: 'Grupa 8', color: '#B0E0E6', faculty: 'Filologia Polska' },
+
+            { id: '9', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Wtorek', time: '13:30', endTime: '15:00', instructor: 'Katarzyna Czarnecka', group: 'Grupa 1', color: '#90EE90', faculty: 'Filologia Polska' },
+            { id: '10', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Środa', time: '15:15', endTime: '16:45', instructor: 'Katarzyna Czarnecka', group: 'Grupa 2', color: '#90EE90', faculty: 'Filologia Polska' },
+            { id: '11', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Wtorek', time: '11:30', endTime: '13:00', instructor: 'Jarosław Liberek', group: 'Grupa 3', color: '#90EE90', faculty: 'Filologia Polska' },
+            { id: '12', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Środa', time: '15:15', endTime: '16:45', instructor: 'Jarosław Liberek', group: 'Grupa 4', color: '#90EE90', faculty: 'Filologia Polska' },
+            { id: '13', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Wtorek', time: '09:45', endTime: '11:15', instructor: 'Monika Błaszczak-Stachowiak', group: 'Grupa 5', color: '#90EE90', faculty: 'Filologia Polska' },
+            { id: '14', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Wtorek', time: '15:15', endTime: '16:45', instructor: 'Dorota Masłej', group: 'Grupa 6', color: '#90EE90', faculty: 'Filologia Polska' },
+            { id: '15', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Wtorek', time: '17:00', endTime: '18:30', instructor: 'Aleksandra Sikorska-Krystek', group: 'Grupa 7', color: '#90EE90', faculty: 'Filologia Polska' },
+            { id: '16', title: 'Warsztat polonisty - pisanie - Ćwiczenia', day: 'Wtorek', time: '08:00', endTime: '09:30', instructor: 'Jagoda Kurnikowska', group: 'Grupa 8', color: '#90EE90', faculty: 'Filologia Polska' },
+
+            { id: '17', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Piątek', time: '11:30', endTime: '13:00', instructor: 'Monika Szczot', group: 'Grupa 1', color: '#FFB6C1', faculty: 'Filologia Polska' },
+            { id: '18', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Piątek', time: '13:30', endTime: '15:00', instructor: 'Monika Szczot', group: 'Grupa 2', color: '#FFB6C1', faculty: 'Filologia Polska' },
+            { id: '19', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Piątek', time: '09:45', endTime: '11:15', instructor: 'Konrad Dominas', group: 'Grupa 3', color: '#FFB6C1', faculty: 'Filologia Polska' },
+            { id: '20', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Czwartek', time: '08:00', endTime: '09:30', instructor: 'Katarzyna Kaniecka-Juszczak', group: 'Grupa 4', color: '#FFB6C1', faculty: 'Filologia Polska' },
+            { id: '21', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Czwartek', time: '09:45', endTime: '11:15', instructor: 'Katarzyna Kaniecka-Juszczak', group: 'Grupa 5', color: '#FFB6C1', faculty: 'Filologia Polska' },
+            { id: '22', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Czwartek', time: '11:30', endTime: '13:00', instructor: 'Katarzyna Kaniecka-Juszczak', group: 'Grupa 6', color: '#FFB6C1', faculty: 'Filologia Polska' },
+            { id: '23', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Czwartek', time: '18:45', endTime: '20:15', instructor: 'Katarzyna Kaniecka-Juszczak', group: 'Grupa 7', color: '#FFB6C1', faculty: 'Filologia Polska' },
+            { id: '24', title: 'Język łaciński z elementami kultury antycznej - Ćwiczenia', day: 'Czwartek', time: '15:15', endTime: '16:45', instructor: 'Marlena Puk', group: 'Grupa 8', color: '#FFB6C1', faculty: 'Filologia Polska' },
+
+            { id: '25', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Piątek', time: '08:00', endTime: '09:30', instructor: 'Karolina Ruta-Korytowska', group: 'Grupa 1', color: '#D8BFD8', faculty: 'Filologia Polska' },
+            { id: '26', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Piątek', time: '11:30', endTime: '13:00', instructor: 'Karolina Ruta-Korytowska', group: 'Grupa 2', color: '#D8BFD8', faculty: 'Filologia Polska' },
+            { id: '27', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Czwartek', time: '11:30', endTime: '13:00', instructor: 'Małgorzata Rybka', group: 'Grupa 3', color: '#D8BFD8', faculty: 'Filologia Polska' },
+            { id: '28', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Czwartek', time: '13:30', endTime: '15:00', instructor: 'Małgorzata Rybka', group: 'Grupa 4', color: '#D8BFD8', faculty: 'Filologia Polska' },
+            { id: '29', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Czwartek', time: '09:45', endTime: '11:15', instructor: 'Marta Wrześniewska-Pietrzak', group: 'Grupa 5', color: '#D8BFD8', faculty: 'Filologia Polska' },
+            { id: '30', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Piątek', time: '09:45', endTime: '11:15', instructor: 'Ewa Kaptur', group: 'Grupa 6', color: '#D8BFD8', faculty: 'Filologia Polska' },
+            { id: '31', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Czwartek', time: '17:00', endTime: '18:30', instructor: 'Alicja Przybylska', group: 'Grupa 7', color: '#D8BFD8', faculty: 'Filologia Polska' },
+            { id: '32', title: 'Nauka o współczesnym języku polskim - Ćwiczenia', day: 'Czwartek', time: '08:00', endTime: '09:30', instructor: 'Magdalena Socha', group: 'Grupa 8', color: '#D8BFD8', faculty: 'Filologia Polska' },
+
+            { id: '33', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Środa', time: '08:00', endTime: '09:30', instructor: 'Olga Ziółkowska', group: 'Grupa 1', color: '#FFFACD', faculty: 'Filologia Polska' },
+            { id: '34', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Środa', time: '09:45', endTime: '11:15', instructor: 'Olga Ziółkowska', group: 'Grupa 2', color: '#FFFACD', faculty: 'Filologia Polska' },
+            { id: '35', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Środa', time: '11:30', endTime: '13:00', instructor: 'Olga Ziółkowska', group: 'Grupa 3', color: '#FFFACD', faculty: 'Filologia Polska' },
+            { id: '36', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Wtorek', time: '13:30', endTime: '15:00', instructor: 'Marek Osiewicz', group: 'Grupa 4', color: '#FFFACD', faculty: 'Filologia Polska' },
+            { id: '37', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Wtorek', time: '15:15', endTime: '16:45', instructor: 'Marek Osiewicz', group: 'Grupa 5', color: '#FFFACD', faculty: 'Filologia Polska' },
+            { id: '38', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Wtorek', time: '11:30', endTime: '13:00', instructor: 'Katarzyna Krzak-Weiss', group: 'Grupa 6', color: '#FFFACD', faculty: 'Filologia Polska' },
+            { id: '39', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Wtorek', time: '08:00', endTime: '09:30', instructor: 'N/A', group: 'Grupa 7', color: '#FFFACD', faculty: 'Filologia Polska' },
+            { id: '40', title: 'Nauki pomocnicze - Ćwiczenia', day: 'Wtorek', time: '09:45', endTime: '11:15', instructor: 'N/A', group: 'Grupa 8', color: '#FFFACD', faculty: 'Filologia Polska' },
+
+            { id: '41', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Wtorek', time: '11:30', endTime: '13:00', instructor: 'Joanna Smół', group: 'Grupa 1', color: '#E6E6FA', faculty: 'Filologia Polska' },
+            { id: '42', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Wtorek', time: '13:30', endTime: '15:00', instructor: 'Joanna Smół', group: 'Grupa 2', color: '#E6E6FA', faculty: 'Filologia Polska' },
+            { id: '43', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Wtorek', time: '15:15', endTime: '16:45', instructor: 'Justyna Kobus', group: 'Grupa 3', color: '#E6E6FA', faculty: 'Filologia Polska' },
+            { id: '44', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Środa', time: '15:15', endTime: '16:45', instructor: 'Justyna Kobus', group: 'Grupa 4', color: '#E6E6FA', faculty: 'Filologia Polska' },
+            { id: '45', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Czwartek', time: '17:00', endTime: '18:30', instructor: 'Błażej Osowski', group: 'Grupa 5', color: '#E6E6FA', faculty: 'Filologia Polska' },
+            { id: '46', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Środa', time: '15:15', endTime: '16:45', instructor: 'Ewa Kaptur', group: 'Grupa 6', color: '#E6E6FA', faculty: 'Filologia Polska' },
+            { id: '47', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Wtorek', time: '09:45', endTime: '11:15', instructor: 'Eliza Grzelak', group: 'Grupa 7', color: '#E6E6FA', faculty: 'Filologia Polska' },
+            { id: '48', title: 'Mówienie - warsztat polonisty - Ćwiczenia', day: 'Wtorek', time: '08:00', endTime: '09:30', instructor: 'Przemysław Raczyk', group: 'Grupa 8', color: '#E6E6FA', faculty: 'Filologia Polska' },
+
+            { id: '49', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Czwartek', time: '11:30', endTime: '13:00', instructor: 'Grzegorz Raubo', group: 'Grupa 1', color: '#ADD8E6', faculty: 'Filologia Polska' },
+            { id: '50', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Czwartek', time: '13:30', endTime: '15:00', instructor: 'Grzegorz Raubo', group: 'Grupa 2', color: '#ADD8E6', faculty: 'Filologia Polska' },
+            { id: '51', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Piątek', time: '09:45', endTime: '11:15', instructor: 'Leszek Teusz', group: 'Grupa 3', color: '#ADD8E6', faculty: 'Filologia Polska' },
+            { id: '52', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Piątek', time: '11:30', endTime: '13:00', instructor: 'Leszek Teusz', group: 'Grupa 4', color: '#ADD8E6', faculty: 'Filologia Polska' },
+            { id: '53', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Czwartek', time: '17:00', endTime: '18:30', instructor: 'Maciej Parkitny', group: 'Grupa 5', color: '#ADD8E6', faculty: 'Filologia Polska' },
+            { id: '54', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Czwartek', time: '18:45', endTime: '20:15', instructor: 'Maciej Parkitny', group: 'Grupa 6', color: '#ADD8E6', faculty: 'Filologia Polska' },
+            { id: '55', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Czwartek', time: '09:45', endTime: '11:15', instructor: 'Katarzyna Meller', group: 'Grupa 7', color: '#ADD8E6', faculty: 'Filologia Polska' },
+            { id: '56', title: 'Historia literatury staropolskiej i oświecenia - Ćwiczenia', day: 'Czwartek', time: '08:00', endTime: '09:30', instructor: 'Patrycja Bąkowska', group: 'Grupa 8', color: '#ADD8E6', faculty: 'Filologia Polska' },
+
+            // ANGLISTYKA - WYKŁADY
+            { id: '57', title: 'Zarys historii Niderlandów', day: 'Czwartek', time: '15:00', endTime: '15:45', instructor: 'Przemysław Paluszek', group: 'Wykład', color: '#FFA07A', faculty: 'Anglistyka' },
+            { id: '58', title: 'Językoznawstwo ogólne', day: 'Poniedziałek', time: '13:15', endTime: '14:45', instructor: 'Karolina Krawczak-Glynn', group: 'Wykład', color: '#FFA07A', faculty: 'Anglistyka' },
+            { id: '59', title: 'Historia Wysp Brytyjskich', day: 'Poniedziałek', time: '16:45', endTime: '18:15', instructor: 'Tomasz Skirecki', group: 'Wykład', color: '#FFA07A', faculty: 'Anglistyka' },
+            { id: '60', title: 'Historie teatru I', day: 'Środa', time: '15:00', endTime: '16:45', instructor: 'Jacek Fabiszak', group: 'Wykład', color: '#FFA07A', faculty: 'Anglistyka' },
+
+            // FILOLOGIA POLSKA I KLASYCZNA - WYKŁADY
+            { id: '61', title: 'Dzieje literatury staropolskiej i Oświecenia', day: 'Środa', time: '17:00', endTime: '18:30', instructor: 'Grzegorz Raubo', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '62', title: 'Historia filozofii', day: 'Poniedziałek', time: '15:15', endTime: '16:45', instructor: 'Sylwia Panek', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '63', title: 'Historia literatury romantyzmu', day: 'Środa', time: '17:00', endTime: '18:30', instructor: 'Jerzy Fiećko', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '64', title: 'Literatura i życie literackie po roku 1918', day: 'Środa', time: '15:15', endTime: '16:45', instructor: 'Sylwia Panek, Agnieszka Kwiatkowska', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '65', title: 'Literatura i kultura starożytnej Grecji', day: 'Poniedziałek', time: '09:45', endTime: '11:15', instructor: 'Krystyna Bartol', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '66', title: 'Nauka o współczesnym języku polskim: fonetyka, fonologia', day: 'Poniedziałek', time: '13:30', endTime: '15:00', instructor: 'Paweł Nowakowski', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '67', title: 'Nauka o współczesnym języku polskim: składnia', day: 'Czwartek', time: '13:30', endTime: '15:00', instructor: 'Romana Łapa', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '68', title: 'Słowotwórstwo współczesnego języka polskiego', day: 'Czwartek', time: '18:45', endTime: '20:15', instructor: 'Błażej Osowski', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '69', title: 'Teoria literatury', day: 'Wtorek', time: '09:45', endTime: '11:15', instructor: 'Michał Januszkiewicz', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '70', title: 'Wprowadzenie do historii literatury polskiej okresu pozytywizmu', day: 'Środa', time: '15:15', endTime: '16:45', instructor: 'Marek Wedemann', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '71', title: 'Wstęp do literaturoznawstwa', day: 'Środa', time: '09:45', endTime: '11:15', instructor: 'Beata Przymuszała', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+            { id: '72', title: 'Wykłady z historii Polski (966-1795)', day: 'Poniedziałek', time: '17:00', endTime: '18:30', instructor: 'Wojciech Sajkowski', group: 'Wykład', color: '#DDA0DD', faculty: 'Filologia Polska i Klasyczna' },
+
+            // NEOFILOLOGIA - WYKŁADY
+            { id: '73', title: 'Cywilizacje Azji. Literatura popularna przedwojennej Japonii', day: 'Czwartek', time: '11:30', endTime: '13:00', instructor: 'Andrzej Świrkowski', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '74', title: 'Konwersatorium z literatury powszechnej', day: 'Wtorek', time: '08:00', endTime: '09:30', instructor: 'Arkadiusz Żychliński', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '75', title: 'Historia Skandynawii', day: 'Środa', time: '11:30', endTime: '13:00', instructor: 'Sylwia Izabela Schab, Magdalena Żmuda-Trzebiatowska, Tadeusz Wojciech Lange', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '76', title: 'Zarys literatur skandynawskich (Dania, Norwegia)', day: 'Wtorek', time: '09:45', endTime: '11:15', instructor: 'Sylwia Izabela Schab, Aleksandra Wilkus', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '77', title: 'Podstawy tłumaczenia konferencyjnego', day: 'Poniedziałek', time: '15:00', endTime: '16:30', instructor: 'Hanka Błaszkowska', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '78', title: 'Visual Communication in Eastern European Cinema', day: 'Piątek', time: '15:00', endTime: '16:30', instructor: 'Beata Waligórska-Olejniczak', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '79', title: 'Wstęp do socjolingwistyki', day: 'Piątek', time: '11:30', endTime: '13:00', instructor: 'Zofia Szwed', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '80', title: 'Rosja współczesna', day: 'Wtorek', time: '15:00', endTime: '16:30', instructor: 'Antoni Bortnowski', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '81', title: 'Literatura, sztuka, społeczeństwo francuskie I (średniowiecze)', day: 'Wtorek', time: '16:45', endTime: '18:15', instructor: 'Marta Sukiennicka', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '82', title: 'Współczesne życie literackie krajów frankofońskich', day: 'Wtorek', time: '09:45', endTime: '11:15', instructor: 'Jędrzej Pawlicki', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '83', title: 'Historia Francji', day: 'Środa', time: '09:45', endTime: '11:15', instructor: 'Jędrzej Pawlicki', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '84', title: 'Historia Francji', day: 'Środa', time: '11:30', endTime: '13:00', instructor: 'Jędrzej Pawlicki', group: 'Wykład (grupa 2)', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '85', title: 'Historia Półwyspu Iberyjskiego', day: 'Piątek', time: '08:00', endTime: '09:30', instructor: 'Alfons Gregori', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '86', title: 'Włochy współczesne', day: 'Czwartek', time: '08:00', endTime: '09:30', instructor: 'Wawrzyniec Kryza', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '87', title: 'Współczesna literatura portugalska', day: 'Środa', time: '16:45', endTime: '18:15', instructor: 'Wojciech Charchalis', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '88', title: 'Kultura Portugalii', day: 'Środa', time: '18:30', endTime: '20:00', instructor: 'Wojciech Charchalis', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '89', title: 'Język i kultura Basków', day: 'Poniedziałek', time: '13:15', endTime: '15:00', instructor: 'Leire Lazcano Zapatera', group: 'Wykład (część 1)', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '90', title: 'Język i kultura Basków', day: 'Czwartek', time: '15:00', endTime: '16:30', instructor: 'Leire Lazcano Zapatera', group: 'Wykład (część 2)', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '91', title: 'Islam I', day: 'Środa', time: '13:30', endTime: '15:00', instructor: 'Łukasz Piątak', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '92', title: 'Sztuka arabsko-muzułmańska', day: 'Czwartek', time: '09:45', endTime: '11:15', instructor: 'Łukasz Piątak', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '93', title: 'Wstęp do nowogrecystyki', day: 'Wtorek', time: '09:45', endTime: '11:15', instructor: 'Karolina Gortych-Michalak', group: 'Wykład', color: '#F0E68C', faculty: 'Neofilologia' },
+            { id: '94', title: 'Statystyka', day: 'Poniedziałek', time: '13:15', endTime: '16:30', instructor: 'Victoria Kamasa', group: 'Wykład (z przerwą 14:45-15:00)', color: '#F0E68C', faculty: 'Neofilologia' },
+        ];
+    }
+
+    function renderSchedules(schedules, container) {
+        container.innerHTML = '';
+
+        daysOfWeek.forEach(day => {
+            const dayColumn = document.createElement('div');
+            dayColumn.className = 'day-column';
+            dayColumn.innerHTML = `<h3 class="text-center text-dark mb-3 fs-5 fw-bold">${day}</h3>`;
+
+            const timelineContainer = document.createElement('div');
+            timelineContainer.className = 'timeline-container';
+
+            const daySchedules = schedules.filter(s => s.day === day)
+                .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+
+            daySchedules.forEach(schedule => {
+                const scheduleItem = createScheduleItem(schedule, container.id === 'available-schedule-display');
+                timelineContainer.appendChild(scheduleItem);
+            });
+
+            dayColumn.appendChild(timelineContainer);
+            container.appendChild(dayColumn);
+        });
+    }
+
+    function createScheduleItem(schedule, isClickable) {
+        const item = document.createElement('div');
+        item.className = 'schedule-item';
+        item.style.borderLeftColor = schedule.color || '#6c757d';
+
+        if (isClickable) {
+            item.addEventListener('click', () => handleScheduleClick(schedule));
+        }
+
+        item.innerHTML = `
+            <h4>${schedule.title}</h4>
+            <p><strong>Godzina:</strong> ${schedule.time} - ${schedule.endTime}</p>
+            <p><strong>Prowadzący:</strong> ${schedule.instructor || '-'}</p>
+            <p><strong>Grupa:</strong> ${schedule.group || '-'}</p>
+            ${schedule.faculty ? `<p><strong>Wydział:</strong> ${schedule.faculty}</p>` : ''}
+            ${schedule.location ? `<p><strong>Lokalizacja:</strong> ${schedule.location}</p>` : ''}
+        `;
+
+        return item;
+    }
+
+    function handleScheduleClick(schedule) {
+        const conflict = checkConflict(schedule, mySchedules);
+
+        if (conflict === true) {
+            return;
+        }
+
+        if (conflict) {
+            pendingConflictSchedule = schedule;
+            currentConflictTitle.textContent = conflict.title;
+            newConflictTitle.textContent = schedule.title;
+            conflictModal.classList.add('show');
+        } else {
+            addToMySchedule(schedule);
+        }
+    }
+
+    function addToMySchedule(schedule) {
+        // Ostrzeżenie o czasie dojścia (jeśli są lokalizacje)
+        try { checkTravelTimeAndWarn(schedule); } catch (e) { /* no-op */ }
+        mySchedules.push({ ...schedule });
+        saveMySchedules();
+        renderSchedules(mySchedules, myScheduleDisplay);
+        showMessage(`Dodano: ${schedule.title}`, '');
+    }
+
+    // Event listenery
+    modalCancelButton.addEventListener('click', () => {
+        conflictModal.classList.remove('show');
+        pendingConflictSchedule = null;
+    });
+
+    modalReplaceButton.addEventListener('click', () => {
+        if (pendingConflictSchedule) {
+            const conflictingSchedule = checkConflict(pendingConflictSchedule, mySchedules);
+            mySchedules = mySchedules.filter(s => s !== conflictingSchedule);
+            addToMySchedule(pendingConflictSchedule);
+            conflictModal.classList.remove('show');
+            pendingConflictSchedule = null;
+        }
+    });
+
+    // Funkcja do przełączania sekcji
+    function showSection(section) {
+        myScheduleSection.classList.add('d-none');
+        readingListSection.classList.add('d-none');
+        planGeneratorSection.classList.add('d-none');
+
+        switch(section) {
+            case 'schedule':
+                myScheduleSection.classList.remove('d-none');
+                break;
+            case 'reading':
+                readingListSection.classList.remove('d-none');
+                break;
+            case 'generator':
+                planGeneratorSection.classList.remove('d-none');
+                break;
+        }
+
+        updateNavButtons(section);
+    }
+
+    // Przyciski nawigacji
+    showScheduleButton.addEventListener('click', () => {
+        showSection('schedule');
+    });
+
+    showReadingListButton.addEventListener('click', () => {
+        showSection('reading');
+    });
+
+    showGeneratorButton.addEventListener('click', () => {
+        showSection('generator');
+    });
+
+    function updateNavButtons(activeSection) {
+        const buttons = [showScheduleButton, showReadingListButton, showGeneratorButton];
+        buttons.forEach(btn => {
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-secondary');
+        });
+
+        switch(activeSection) {
+            case 'schedule':
+                showScheduleButton.classList.remove('btn-secondary');
+                showScheduleButton.classList.add('btn-primary');
+                break;
+            case 'reading':
+                showReadingListButton.classList.remove('btn-secondary');
+                showReadingListButton.classList.add('btn-primary');
+                break;
+            case 'generator':
+                showGeneratorButton.classList.remove('btn-secondary');
+                showGeneratorButton.classList.add('btn-primary');
+                break;
+        }
+    }
+
+    // Filtrowanie i renderowanie dostępnych zajęć
+    function baseTitle(title) {
+        return (title || '').split(' - ')[0].trim();
+    }
+
+    function getFilteredAvailableSchedules() {
+        const q = (scheduleSearchInput?.value || '').toLowerCase();
+        const day = scheduleDayFilter?.value || '';
+        const fac = scheduleFacultyFilter?.value || '';
+        return availableSchedules.filter(s => {
+            const matchesQuery = !q || [s.title, s.instructor, s.faculty].filter(Boolean).some(v => v.toLowerCase().includes(q));
+            const matchesDay = !day || s.day === day;
+            const matchesFaculty = !fac || s.faculty === fac;
+            return matchesQuery && matchesDay && matchesFaculty;
+        });
+    }
+
+    function renderAvailable() {
+        renderSchedules(getFilteredAvailableSchedules(), availableScheduleDisplay);
+    }
+
+    function initSearchFilters() {
+        if (!scheduleSearchInput) return;
+        const rerender = () => renderAvailable();
+        scheduleSearchInput.addEventListener('input', rerender);
+        scheduleDayFilter.addEventListener('change', rerender);
+        scheduleFacultyFilter.addEventListener('change', rerender);
+        scheduleResetFilters.addEventListener('click', (e) => {
+            e.preventDefault();
+            scheduleSearchInput.value = '';
+            scheduleDayFilter.value = '';
+            scheduleFacultyFilter.value = '';
+            renderAvailable();
+        });
+    }
+
+    // Dodawanie własnych zajęć
+    function initCustomEventForm() {
+        if (!customEventForm) return;
+        customEventForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newItem = {
+                id: String(Date.now()),
+                title: customTitle.value?.trim() || 'Nowe zajęcia',
+                day: customDay.value,
+                time: customStart.value,
+                endTime: customEnd.value,
+                instructor: customInstructor.value?.trim() || '',
+                group: customGroup.value?.trim() || '',
+                faculty: customFaculty.value?.trim() || '',
+                location: customLocation.value?.trim() || '',
+                color: customColor.value || '#6c757d'
+            };
+            // Prosta walidacja czasu
+            if (timeToMinutes(newItem.endTime) <= timeToMinutes(newItem.time)) {
+                showMessage('Godzina zakończenia musi być późniejsza niż rozpoczęcia.', 'error');
+                return;
+            }
+            availableSchedules.push(newItem);
+            saveAvailableSchedules();
+            renderAvailable();
+            customEventForm.reset();
+            showMessage('Dodano własne zajęcia do listy dostępnych.', '');
+        });
+    }
+
+    // Ostrzeżenia o czasie dojścia między lokalizacjami
+    const MIN_TRAVEL_MINUTES = 15;
+    function getAdjacentSameDayEvents(schedule, list) {
+        const sameDay = list.filter(s => s.day === schedule.day)
+            .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+        let prev = null, next = null;
+        for (let i = 0; i < sameDay.length; i++) {
+            const s = sameDay[i];
+            const sStart = timeToMinutes(s.time);
+            const sEnd = timeToMinutes(s.endTime);
+            const nStart = timeToMinutes(schedule.time);
+            const nEnd = timeToMinutes(schedule.endTime);
+            if (sEnd <= nStart) prev = s;
+            if (!next && sStart >= nEnd) { next = s; break; }
+        }
+        return { prev, next };
+    }
+
+    function checkTravelTimeAndWarn(newSchedule) {
+        const { prev, next } = getAdjacentSameDayEvents(newSchedule, mySchedules);
+        const warnings = [];
+        if (prev && prev.location && newSchedule.location && prev.location !== newSchedule.location) {
+            const gap = timeToMinutes(newSchedule.time) - timeToMinutes(prev.endTime);
+            if (gap > 0 && gap < MIN_TRAVEL_MINUTES) warnings.push(`mało czasu na dojście z \"${prev.location}\" do \"${newSchedule.location}\" (${gap} min).`);
+        }
+        if (next && next.location && newSchedule.location && next.location !== newSchedule.location) {
+            const gap = timeToMinutes(next.time) - timeToMinutes(newSchedule.endTime);
+            if (gap > 0 && gap < MIN_TRAVEL_MINUTES) warnings.push(`mało czasu na dojście z \"${newSchedule.location}\" do \"${next.location}\" (${gap} min).`);
+        }
+        if (warnings.length) {
+            showMessage(`Uwaga: ${warnings.join(' I ')}`, 'error');
+        }
+    }
+
+    // Interaktywna lista lektur (read/unread w localStorage)
+    function initReadingList() {
+        const items = document.querySelectorAll('#reading-list-section .reading-list-item');
+        if (!items.length) return;
+        const KEY = 'readingListRead';
+        const state = JSON.parse(localStorage.getItem(KEY) || '{}');
+        items.forEach((item, idx) => {
+            const key = (item.textContent || `item_${idx}`).trim();
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm ' + (state[key] ? 'btn-success' : 'btn-outline-success');
+            btn.textContent = state[key] ? 'Przeczytane' : 'Oznacz jako przeczytane';
+            if (state[key]) item.style.opacity = '0.6';
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const newVal = !state[key];
+                state[key] = newVal;
+                localStorage.setItem(KEY, JSON.stringify(state));
+                btn.className = 'btn btn-sm ' + (newVal ? 'btn-success' : 'btn-outline-success');
+                btn.textContent = newVal ? 'Przeczytane' : 'Oznacz jako przeczytane';
+                item.style.opacity = newVal ? '0.6' : '1';
+            });
+            // Dodaj przycisk jeśli nie ma go jeszcze
+            const alreadyHasBtn = item.querySelector('button');
+            if (!alreadyHasBtn) item.appendChild(btn);
+        });
+    }
+
+    // Generator planów (prosta wersja: 1 niekolidujący plan w zakresie czasu)
+    function initGenerator() {
+        if (!generateAllPlansButton) return;
+        generateAllPlansButton.addEventListener('click', () => {
+            const start = startTimeInput.value || '08:00';
+            const end = endTimeInput.value || '18:00';
+            progressContainer.classList.remove('d-none');
+            progressBar.style.width = '30%';
+            setTimeout(() => { progressBar.style.width = '70%'; }, 150);
+
+            const plan = generateOnePlan(start, end);
+            renderGeneratedPlan(plan);
+            progressBar.style.width = '100%';
+            setTimeout(() => { progressContainer.classList.add('d-none'); progressBar.style.width = '0%'; }, 400);
+        });
+    }
+
+    function generateOnePlan(start, end) {
+        const startMin = timeToMinutes(start);
+        const endMin = timeToMinutes(end);
+        const candidates = availableSchedules.filter(s => {
+            const st = timeToMinutes(s.time);
+            const en = timeToMinutes(s.endTime);
+            return st >= startMin && en <= endMin;
+        }).sort((a, b) => (a.day.localeCompare(b.day) || timeToMinutes(a.time) - timeToMinutes(b.time)));
+
+        const plan = [];
+        for (const s of candidates) {
+            // Nie dubluj tego samego przedmiotu (po tytule bazowym)
+            if (plan.some(x => baseTitle(x.title) === baseTitle(s.title))) continue;
+            // Bez kolizji czasowych tego samego dnia
+            const conflict = checkConflict(s, plan);
+            if (!conflict) plan.push(s);
+        }
+        return plan;
+    }
+
+    function renderGeneratedPlan(plan) {
+        allPossiblePlansDisplay.innerHTML = '';
+        if (!plan || !plan.length) {
+            allPossiblePlansDisplay.innerHTML = '<p class="text-center text-secondary">Nie znaleziono pasującego planu w podanym zakresie czasu.</p>';
+            return;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.className = 'border rounded p-3';
+        wrapper.innerHTML = '<h5 class="mb-3">Propozycja planu (bez kolizji)</h5>';
+        const grid = document.createElement('div');
+        grid.className = 'schedule-grid-container';
+        renderSchedules(plan, grid);
+        wrapper.appendChild(grid);
+        allPossiblePlansDisplay.appendChild(wrapper);
+    }
+
+    // Generowanie plików
+    generateHtmlButton.addEventListener('click', generateHtmlPlan);
+    generatePdfButton.addEventListener('click', generatePdfPlan);
+    clearMyPlanButton.addEventListener('click', clearMyPlan);
+
+    function generateHtmlPlan() {
+        if (mySchedules.length === 0) {
+            showMessage('Brak zajęć do wyeksportowania!', 'error');
+            return;
+        }
+
+        const htmlContent = createHtmlPlan();
+        downloadFile('moj-plan-zajec.html', htmlContent, 'text/html');
+        showMessage('HTML został wygenerowany i pobrany!', '');
+    }
+
+    function generatePdfPlan() {
+        if (mySchedules.length === 0) {
+            showMessage('Brak zajęć do wyeksportowania!', 'error');
+            return;
+        }
+
+        // Sprawdzenie czy jsPDF jest dostępne
+        if (typeof window.jspdf === 'undefined') {
+            showMessage('Biblioteka PDF nie została załadowana. Spróbuj odświeżyć stronę.', 'error');
+            return;
+        }
+
+        try {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = createHtmlPlan();
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            tempDiv.style.width = '800px';
+            tempDiv.style.backgroundColor = 'white';
+            tempDiv.style.padding = '20px';
+            document.body.appendChild(tempDiv);
+
+            // Sprawdzenie czy html2canvas jest dostępne
+            if (typeof html2canvas === 'undefined') {
+                showMessage('Biblioteka html2canvas nie została załadowana.', 'error');
+                document.body.removeChild(tempDiv);
+                return;
+            }
+
+            html2canvas(tempDiv, {
+                backgroundColor: '#ffffff',
+                scale: 2
+            }).then(canvas => {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 210;
+                const pageHeight = 295;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                pdf.save('moj-plan-zajec.pdf');
+
+                document.body.removeChild(tempDiv);
+                showMessage('PDF został wygenerowany i pobrany!', '');
+            }).catch(error => {
+                console.error('Błąd podczas generowania PDF:', error);
+                showMessage('Błąd podczas generowania PDF', 'error');
+                document.body.removeChild(tempDiv);
+            });
+        } catch (error) {
+            console.error('Błąd PDF:', error);
+            showMessage('Błąd podczas generowania PDF', 'error');
+        }
+    }
+
+    function createHtmlPlan() {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Mój Plan Zajęć</title>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    .schedule-item { border: 1px solid #ddd; margin: 10px 0; padding: 10px; border-radius: 5px; }
+                    h1 { color: #333; text-align: center; }
+                    h3 { color: #666; margin-bottom: 5px; }
+                    p { margin: 5px 0; }
+                </style>
+            </head>
+            <body>
+                <h1>Mój Plan Zajęć</h1>
+                ${mySchedules.map(s => `
+                    <div class="schedule-item">
+                        <h3>${s.title}</h3>
+                        <p><strong>Dzień:</strong> ${s.day}</p>
+                        <p><strong>Godzina:</strong> ${s.time} - ${s.endTime}</p>
+                        <p><strong>Prowadzący:</strong> ${s.instructor}</p>
+                        <p><strong>Grupa:</strong> ${s.group}</p>
+                        ${s.faculty ? `<p><strong>Wydział:</strong> ${s.faculty}</p>` : ''}
+                    </div>
+                `).join('')}
+            </body>
+            </html>
+        `;
+    }
+
+    function downloadFile(filename, content, type) {
+        const blob = new Blob([content], { type });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    function clearMyPlan() {
+        if (confirm('Czy na pewno chcesz wyczyścić swój plan zajęć?')) {
+            mySchedules = [];
+            saveMySchedules();
+            renderSchedules(mySchedules, myScheduleDisplay);
+            showMessage('Plan został wyczyszczony!', '');
+        }
+    }
+
+    // Generator planów - placeholder
+    if (generateAllPlansButton) {
+        generateAllPlansButton.addEventListener('click', () => {
+            showMessage('Funkcja generatora planów w trakcie implementacji!', 'error');
+        });
+    }
+
+    // Inicjalizacja
+    loadAvailableSchedules();
+    loadMySchedules();
+    renderAvailable();
+    renderSchedules(mySchedules, myScheduleDisplay);
+    initReadingList();
+    initSearchFilters();
+    initCustomEventForm();
+    initGenerator();
+    showSection('schedule');
+});
+    </script>
+</head>
+<body class="p-4">
+<div class="container-fluid bg-white shadow rounded-3 p-4 p-lg-5 app-container">
+    <h1 class="text-center text-dark mb-4 fs-2 fw-bold">Mój Harmonogram Zajęć i Listy Lektur</h1>
+
+    <!-- Message Box -->
+    <div id="message-box" class="message-box"></div>
+
+    <!-- Conflict Modal -->
+    <div id="conflict-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="modal-title fs-4 fw-bold text-dark mb-3">Konflikt w Harmonogramie!</h3>
+            <p class="text-secondary mb-3">Zajęcia <span id="current-conflict-title" class="fw-semibold"></span> kolidują z <span id="new-conflict-title" class="fw-semibold"></span>.</p>
+            <p class="text-secondary mb-4">Czy chcesz zastąpić istniejące zajęcia nowymi?</p>
+            <div class="d-flex justify-content-end gap-2">
+                <button id="modal-cancel" class="btn btn-secondary btn-sm">Anuluj</button>
+                <button id="modal-replace" class="btn btn-danger btn-sm">Zastąp</button>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4 border-secondary">
+
+    <!-- Toggle Buttons -->
+    <div class="d-flex flex-wrap justify-content-center gap-2 mb-4">
+        <button id="show-schedule-button" class="btn btn-primary btn-sm shadow rounded-pill">Pokaż Mój Plan Zajęć</button>
+        <button id="show-reading-list-button" class="btn btn-secondary btn-sm shadow rounded-pill">Pokaż Listy Lektur</button>
+        <button id="show-generator-button" class="btn btn-secondary btn-sm shadow rounded-pill">Pokaż Generator Planów</button>
+    </div>
+
+    <!-- My Schedule Section -->
+    <div id="my-schedule-section" class="content-section">
+        <h2 class="text-center text-dark mb-4 fs-3 fw-bold">Mój Plan Zajęć</h2>
+        <div class="d-flex flex-wrap justify-content-center gap-2 mb-4">
+            <button id="generate-html-button" class="btn btn-success btn-sm shadow rounded-pill">Generuj HTML Plan</button>
+            <button id="generate-pdf-button" class="btn btn-info btn-sm shadow rounded-pill text-white">Generuj PDF Plan</button>
+            <button id="clear-my-plan-button" class="btn btn-warning btn-sm shadow rounded-pill">Wyczyść Mój Plan</button>
+        </div>
+
+        <div id="my-schedule-display" class="schedule-grid-container mb-4"></div>
+
+        <hr class="my-4 border-secondary">
+
+        <h2 class="text-center text-dark mb-4 fs-3 fw-bold">Dostępne Zajęcia</h2>
+        <div class="container mb-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label for="schedule-search-input" class="form-label mb-1">Szukaj</label>
+                    <input id="schedule-search-input" type="text" class="form-control" placeholder="Tytuł, prowadzący, wydział...">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label for="schedule-day-filter" class="form-label mb-1">Dzień</label>
+                    <select id="schedule-day-filter" class="form-select">
+                        <option value="">Wszystkie</option>
+                        <option value="Poniedziałek">Poniedziałek</option>
+                        <option value="Wtorek">Wtorek</option>
+                        <option value="Środa">Środa</option>
+                        <option value="Czwartek">Czwartek</option>
+                        <option value="Piątek">Piątek</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label for="schedule-faculty-filter" class="form-label mb-1">Wydział</label>
+                    <select id="schedule-faculty-filter" class="form-select">
+                        <option value="">Wszystkie</option>
+                        <option>Filologia Polska</option>
+                        <option>Anglistyka</option>
+                        <option>Filologia Polska i Klasyczna</option>
+                        <option>Neofilologia</option>
+                    </select>
+                </div>
+                <div class="col-12 mt-2">
+                    <button id="schedule-reset-filters" class="btn btn-sm btn-outline-secondary">Wyczyść filtry</button>
+                </div>
+            </div>
+        </div>
+        <div class="border rounded p-3 mb-3">
+            <h5 class="mb-2">Dodaj własne zajęcia</h5>
+            <form id="custom-event-form" class="row g-2">
+                <div class="col-12 col-md-4">
+                    <input class="form-control" id="custom-title" placeholder="Tytuł" required>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select class="form-select" id="custom-day" required>
+                        <option value="">Dzień...</option>
+                        <option>Poniedziałek</option>
+                        <option>Wtorek</option>
+                        <option>Środa</option>
+                        <option>Czwartek</option>
+                        <option>Piątek</option>
+                    </select>
+                </div>
+                <div class="col-3 col-md-2">
+                    <input class="form-control" id="custom-start" type="time" required>
+                </div>
+                <div class="col-3 col-md-2">
+                    <input class="form-control" id="custom-end" type="time" required>
+                </div>
+                <div class="col-6 col-md-2">
+                    <input class="form-control" id="custom-instructor" placeholder="Prowadzący">
+                </div>
+                <div class="col-6 col-md-2">
+                    <input class="form-control" id="custom-group" placeholder="Grupa/Wykład">
+                </div>
+                <div class="col-6 col-md-2">
+                    <input class="form-control" id="custom-faculty" placeholder="Wydział">
+                </div>
+                <div class="col-6 col-md-2">
+                    <input class="form-control" id="custom-location" placeholder="Lokalizacja (np. Coll. Maius)">
+                </div>
+                <div class="col-6 col-md-2">
+                    <input class="form-control" id="custom-color" type="color" value="#6c757d" title="Kolor">
+                </div>
+                <div class="col-12 col-md-2">
+                    <button class="btn btn-primary w-100" type="submit">Dodaj</button>
+                </div>
+            </form>
+        </div>
+        <div id="available-schedule-display" class="schedule-grid-container"></div>
+    </div>
+
+    <!-- Reading List Section -->
+    <div id="reading-list-section" class="content-section d-none">
+        <h2 class="text-center text-dark mb-4 fs-3 fw-bold">Obowiązkowe Lektury</h2>
+
+        <!-- ZASOBY ONLINE - Karty z linkami -->
+        <div class="mb-4">
+            <h3 class="fs-5 fw-bold text-dark mb-3 text-center">Zasoby online (darmowe)</h3>
+            <div class="row g-3">
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Homer — Iliada</h5>
+                            <p class="card-subtitle text-muted mb-3">Wolne Lektury</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://wolnelektury.pl/katalog/lektura/homer-iliada.html">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Platon — Uczta</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła (tłum. W. Witwicki)</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Uczta_(Platon,_t%C5%82um._Witwicki)">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Wergiliusz — Eneida</h5>
+                            <p class="card-subtitle text-muted mb-3">Łacina: Perseus / The Latin Library</p>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer" href="http://www.perseus.tufts.edu/hopper/text?doc=Verg.%20A.">Perseus</a>
+                                <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer" href="https://www.thelatinlibrary.com/vergil.html">Latin Library</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Horacy — Sztuka poetycka</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła (List do Pizonów)</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Sztuka_poetycka_(Horacy)">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Horacy — Ody</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła (wybór)</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Ody_(Horacy)">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Horacy — Epody</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła (wybór)</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Epody_(Horacy)">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Owidiusz — Metamorfozy</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła (wybrane księgi)</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Metamorfozy_(Owidiusz)">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Biblia (Wujek) — wybrane księgi</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Biblia_Wujka">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Św. Augustyn — Wyznania</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła (łacina, wybór)</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Aurelii_Augustini_Confessiones">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Bogurodzica</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Bogurodzica">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Posłuchajcie, bracia miła</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Pos%C5%82uchajcie,_bracia_mi%C5%82a">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Rozmowa Mistrza Polikarpa ze Śmiercią</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Rozmowa_Mistrza_Polikarpa_ze_%C5%9Amierci%C4%85">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">Skarga umierającego</h5>
+                            <p class="card-subtitle text-muted mb-3">Wikiźródła</p>
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener noreferrer" href="https://pl.wikisource.org/wiki/Skarga_umieraj%C4%85cego">Czytaj</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-muted small mt-2 text-center">Uwaga: część współczesnych przekładów jest chroniona prawem autorskim — tu podlinkowano domenę publiczną i legalnie udostępnione źródła.</p>
+        </div>
+        <!-- KONIEC: ZASOBY ONLINE -->
+
+        <div class="accordion" id="readingListAccordion">
+            <!-- TRADITIO PAGANA -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingPagana">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePagana" aria-expanded="false" aria-controls="collapsePagana">
+                        Traditio Pagana
+                    </button>
+                </h2>
+                <div id="collapsePagana" class="accordion-collapse collapse" aria-labelledby="headingPagana" data-bs-parent="#readingListAccordion">
+                    <div class="accordion-body">
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>HOMER: Iliada</strong><br>
+                                <small>przeł. K. Jeżewska, oprac. J. Łanowski, BN II 17; lub: przeł. I. Wieniewski.</small>
+                            </div>
+                            <a href="https://wolnelektury.pl/katalog/lektura/homer-iliada.html" target="_blank" class="btn btn-sm btn-outline-info">Czytaj</a>
+                        </div>
+                        <div class="reading-list-item">
+                            <strong>PLATON: Uczta</strong><br>
+                            <small>przeł. W. Witwicki.</small>
+                        </div>
+                        <div class="reading-list-item">
+                            <strong>WERGILIUSZ: Eneida</strong><br>
+                            <small>przeł. T. Karyłowski, oprac. S. Stabryła, BN II 29 (obowiązują ks. 1-3; 6).</small>
+                        </div>
+                        <div class="reading-list-item">
+                            <strong>TRZY POETYKI KLASYCZNE</strong><br>
+                            <small>oprac. T. Sinko, BN II 57 (obowiązuje List do Pizonów Horacego).</small>
+                        </div>
+                        <div class="reading-list-item">
+                            <strong>HORACY: Ody i epody</strong><br>
+                            <small>w: Dzieła wszystkie, oprac. O. Jurewicz; lub: przeł. A. Lam, Warszawa 2008 (wybór).</small>
+                        </div>
+                        <div class="reading-list-item">
+                            <strong>OWIDIUSZ: Metamorfozy</strong><br>
+                            <small>przeł. A. Kamieńska, S. Stabryła, oprac. S. Stabryła, BN II 76 (obowiązują ks. 1-2 oraz dwie wybrane).</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TRADITIO HEBRAICA ET CHRISTIANA -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingHebraica">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHebraica" aria-expanded="false" aria-controls="collapseHebraica">
+                        Traditio Hebraica et Christiana
+                    </button>
+                </h2>
+                <div id="collapseHebraica" class="accordion-collapse collapse" aria-labelledby="headingHebraica" data-bs-parent="#readingListAccordion">
+                    <div class="accordion-body">
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>PISMO ŚWIĘTE STAREGO I NOWEGO TESTAMENTU</strong><br>
+                                <small>Biblia Wujka; wybrane księgi: Rodzaju, Lamentacje, Pnp, Łk, J, Ap.</small>
+                            </div>
+                            <a href="https://pl.wikisource.org/wiki/Biblia_Wujka" target="_blank" class="btn btn-sm btn-outline-info">Czytaj</a>
+                        </div>
+                        <div class="reading-list-item">
+                            <strong>ŚW. AUGUSTYN: Wyznania</strong><br>
+                            <small>tłum./łac. — źródła historyczne, edycje różne.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ŚREDNIOWIECZE -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingSredniowiecze">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSredniowiecze" aria-expanded="false" aria-controls="collapseSredniowiecze">
+                        Średniowiecze
+                    </button>
+                </h2>
+                <div id="collapseSredniowiecze" class="accordion-collapse collapse" aria-labelledby="headingSredniowiecze" data-bs-parent="#readingListAccordion">
+                    <div class="accordion-body">
+                        <h4>TEKSTY</h4>
+                        <h5>LITERATURA POLSKA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>ŚREDNIOWIECZNA PROZA POLSKA</strong><br>
+                                <small>m.in. Kazania świętokrzyskie; Rozmyślanie przemyskie.</small>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>ŚREDNIOWIECZNA PIEŚŃ RELIGIJNA POLSKA</strong><br>
+                                <small>Bogurodzica; Posłuchajcie bracia miła; pieśni Wł. z Gielniowa…</small>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>POLSKA POEZJA ŚWIECKA XV WIEKU</strong><br>
+                                <small>Słota, Satyra na chytrych kmieciów, Rozmowa Mistrza Polikarpa…</small>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>ANONIM TZW. GALL: Kronika polska</strong>
+                            </div>
+                        </div>
+                        <h5>LITERATURA OBCA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>DANTE: Boska komedia (Piekło)</strong>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>ARCYDZIEŁA FRANCUSKIEGO ŚREDNIOWIECZA</strong>
+                            </div>
+                        </div>
+                        <h4>PODRĘCZNIK</h4>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>T. WITCZAK: Literatura Średniowiecza</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ODRODZENIE -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingOdrodzenie">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOdrodzenie" aria-expanded="false" aria-controls="collapseOdrodzenie">
+                        Odrodzenie
+                    </button>
+                </h2>
+                <div id="collapseOdrodzenie" class="accordion-collapse collapse" aria-labelledby="headingOdrodzenie" data-bs-parent="#readingListAccordion">
+                    <div class="accordion-body">
+                        <h4>TEKSTY</h4>
+                        <h5>LITERATURA POLSKA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>ANTOLOGIA POEZJI ŁACIŃSKIEJ W POLSCE</strong>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>M. REJ: Wybór pism</strong>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>A. FRYCZ-MODRZEWSKI: Wybór pism</strong>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>J. KOCHANOWSKI: Treny, Fraszki, Pieśni, Psałterz, Odprawa…</strong>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>Ł. GÓRNICKI: Dworzanin polski</strong>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>M. SĘP-SZARZYŃSKI: Rytmy…</strong>
+                            </div>
+                        </div>
+                        <h5>LITERATURA OBCA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>Petrarka, Boccaccio, Erazm, Rabelais…</strong>
+                            </div>
+                        </div>
+                        <h4>PODRĘCZNIK</h4>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>J. ZIOMEK: Literatura Odrodzenia</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BAROK -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingBarok">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBarok" aria-expanded="false" aria-controls="collapseBarok">
+                        Barok
+                    </button>
+                </h2>
+                <div id="collapseBarok" class="accordion-collapse collapse" aria-labelledby="headingBarok" data-bs-parent="#readingListAccordion">
+                    <div class="accordion-body">
+                        <h4>TEKSTY</h4>
+                        <h5>LITERATURA POLSKA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>Antologie i poeci polskiego baroku</strong>
+                            </div>
+                        </div>
+                        <h5>LITERATURA OBCA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>T. Tasso, Corneille, Molier (wybór)</strong>
+                            </div>
+                        </div>
+                        <h4>PODRĘCZNIK</h4>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>C. HERNAS: Literatura baroku</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OŚWIECENIE -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingOswiecenie">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOswiecenie" aria-expanded="false" aria-controls="collapseOswiecenie">
+                        Oświecenie
+                    </button>
+                </h2>
+                <div id="collapseOswiecenie" class="accordion-collapse collapse" aria-labelledby="headingOswiecenie" data-bs-parent="#readingListAccordion">
+                    <div class="accordion-body">
+                        <h4>TEKSTY</h4>
+                        <h5>LITERATURA POLSKA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>Antologie, Krasicki (Monachomachia, Satyry, Bajki…)</strong>
+                            </div>
+                        </div>
+                        <h5>LITERATURA OBCA</h5>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>Sterne, Diderot, Voltaire, Rousseau (wybór)</strong>
+                            </div>
+                        </div>
+                        <h4>PODRĘCZNIKI</h4>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>M. KLIMOWICZ: Literatura Oświecenia</strong>
+                            </div>
+                        </div>
+                        <div class="reading-list-item">
+                            <div>
+                                <strong>R. PRZYBYLSKI: Klasycyzm… (cz. 2)</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- /accordion -->
+    </div> <!-- /reading-list-section -->
+
+    <!-- Schedule Generator Section -->
+    <div id="plan-generator-section" class="content-section d-none">
+        <h2 class="text-center text-dark mb-4 fs-3 fw-bold">Generator Planów Zajęć</h2>
+        <p class="text-center text-secondary mb-4">Podaj zakres godzin, a znajdę wszystkie możliwe, niekolidujące ze sobą plany!</p>
+        <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 mb-4">
+            <div class="form-group">
+                <label for="start-time-input">Godzina od:</label>
+                <input type="time" id="start-time-input" class="form-control" value="08:00">
+            </div>
+            <div class="form-group">
+                <label for="end-time-input">Godzina do:</label>
+                <input type="time" id="end-time-input" class="form-control" value="18:00">
+            </div>
+            <button id="generate-all-plans-button" class="btn btn-primary btn-lg shadow rounded-pill mt-3">Generuj!</button>
+        </div>
+        <div id="progress-container" class="progress-container d-none">
+            <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <hr class="my-4 border-secondary">
+        <div id="all-possible-plans-display" class="d-flex flex-column gap-4">
+            <p class="text-center text-secondary">Wyniki pojawią się tutaj.</p>
+        </div>
+    </div>
+</div>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+</body>
+</html>
